@@ -1,0 +1,46 @@
+name: Scheduled Data Generator # 工作流名称
+
+on:
+  # 设置定时任务触发器 (Cron表达式)
+  schedule:
+    # '*/10 * * * *' 表示每小时的第 0, 10, 20, 30, 40, 50 分钟运行一次。
+    # GitHub Actions 的时间基于 UTC。
+    - cron: '*/10 * * * *'
+  
+  # 允许手动触发，方便测试
+  workflow_dispatch: 
+
+jobs:
+  generate_and_commit:
+    runs-on: ubuntu-latest # 使用 GitHub 提供的 Linux 虚拟机运行
+
+    steps:
+      # 1. 检出代码 (必须，以便 Actions 能访问和修改文件)
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        # 必须设置 fetch-depth: 0 以拉取完整历史，否则后续的提交可能会失败
+        with:
+          fetch-depth: 0
+
+      # 2. 设置 Python 环境
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # 3. 运行 Python 脚本
+      - name: Run Data Generation Script
+        run: python test_github_actions.py
+
+      # 4. 提交更改回仓库 (使用 EndBug/add-and-commit Action)
+      - name: Commit and Push Changes
+        # 这个第三方 Action 简化了 Git add/commit/push 流程
+        uses: EndBug/add-and-commit@v9 
+        with:
+          # 只提交修改的 scheduled_data.csv
+          add: 'scheduled_data.csv' 
+          # 提交信息
+          message: 'docs: Auto update data (Timestamp: ${{ github.event.schedule }})' 
+          # 使用默认的 GitHub token 进行身份验证
+          # GITHUB_TOKEN 具有自动写入仓库的权限
+          default_author: github_actions
