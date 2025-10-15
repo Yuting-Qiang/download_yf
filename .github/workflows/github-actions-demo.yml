@@ -13,7 +13,8 @@ on:
 jobs:
   generate_and_commit:
     runs-on: ubuntu-latest # 使用 GitHub 提供的 Linux 虚拟机运行
-
+    permissions:
+        contents: write # 授予对仓库内容（文件）的写入权限
     steps:
       # 1. 检出代码 (必须，以便 Actions 能访问和修改文件)
       - name: Checkout Repository
