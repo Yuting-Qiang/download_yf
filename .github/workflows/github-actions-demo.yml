@@ -29,19 +29,27 @@ jobs:
         with:
           python-version: '3.x'
 
-      # 3. 运行 Python 脚本
-      - name: Run Data Generation Script
-        run: python test_github_actions.py
+      # =======================================================
+      # 关键步骤：创建 credentials 文件
+      # =======================================================
+      - name: Create Google Drive Credentials File
+        # 使用 echo 命令将 Secret 变量的内容写入到 settings.yaml 文件中
+        run: echo "${{ secrets.GDRIVE_CREDENTIALS }}" > settings.yaml
+        shell: bash
+      
+      # =======================================================
+      # 关键改进 1: 生成并使用今天的日期
+      # =======================================================
+      - name: Run Data Pipeline (Download, Process, Upload)
+        # 使用 'date' 命令生成 YYYY-MM-DD 格式的字符串
+        run: |
+          TODAY_DATE=$(date +'%Y-%m-%d') 
+          
+          echo "今天的日期是: $TODAY_DATE"
+          
+          # 执行你的 Python 脚本，将日期作为命令行参数传递
+          python get_data.py --date=$TODAY_DATE --where=hk
 
-      # 4. 提交更改回仓库 (使用 EndBug/add-and-commit Action)
-      - name: Commit and Push Changes
-        # 这个第三方 Action 简化了 Git add/commit/push 流程
-        uses: EndBug/add-and-commit@v9 
-        with:
-          # 只提交修改的 scheduled_data.csv
-          add: 'scheduled_data.csv' 
-          # 提交信息
-          message: 'docs: Auto update data (Timestamp: ${{ github.event.schedule }})' 
-          # 使用默认的 GitHub token 进行身份验证
-          # GITHUB_TOKEN 具有自动写入仓库的权限
-          default_author: github_actions
+          # 上传文件
+          python upload_gdrive.py --date=$TODAY_DATE --where=hk
+          
