@@ -52,6 +52,9 @@ jobs:
           # 执行你的 Python 脚本，将日期作为命令行参数传递
           python get_data.py --date=$TODAY_DATE --where=hk
 
+          # 显示settings.yaml
+          cat settings.yaml
+          
           # 上传文件
           python upload_gdrive.py --date=$TODAY_DATE --where=hk
           
