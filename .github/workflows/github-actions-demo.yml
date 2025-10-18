@@ -47,6 +47,9 @@ jobs:
           
           echo "今天的日期是: $TODAY_DATE"
           
+          # install packages
+          pip install -r requirements.txt
+          
           # 执行你的 Python 脚本，将日期作为命令行参数传递
           python get_data.py --date=$TODAY_DATE --where=hk
 
