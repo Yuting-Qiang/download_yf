@@ -1,3 +1,4 @@
-pandas
-yfinance
-pyarrow
+pandas==2.3.1
+yfinance==0.2.66
+pyarrow==21.0.0
+pydrive2
