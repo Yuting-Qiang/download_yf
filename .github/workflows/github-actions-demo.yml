@@ -33,7 +33,8 @@ jobs:
       # =======================================================
       - name: Create Google Drive Credentials File
         # 使用 echo 命令将 Secret 变量的内容写入到 settings.yaml 文件中
-        run: echo "${{ secrets.GDRIVE_CREDENTIALS_V2 }}" > settings.yaml
+        run: |
+          printf '%s' '${{ secrets.GDRIVE_CREDENTIALS_V2 }}' > settings.yaml
         shell: bash
       
       # =======================================================
