@@ -1,98 +1,125 @@
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 import os
-import argparse
 
 # --- 配置 ---
-TARGET_FOLDER_ID = None  # 示例: '1A2b3C4d5E6f7G8h9I0jK1l2M3n4O5p6Q'
+# 本地要上传的完整文件夹路径
+LOCAL_UPLOAD_PATH = './dataset/hsi_stock_data/Date=2025-10-17' 
+# 云端目标父目录路径 (上传后，新文件夹将位于此路径下)
+DRIVE_PARENT_PATH = 'stock_dataset/hsi_stock_data'
 
+# --- 认证和路径解析函数 (假设它们已修复并正常工作) ---
 
 def authenticate_drive():
     """加载本地凭证并刷新令牌以进行认证"""
     gauth = GoogleAuth()
-
-    # 尝试加载 settings.yaml 或 token.json 文件中的凭证
-    # PyDrive2 会自动寻找并加载已保存的凭证
+    
     try:
         gauth.LoadCredentialsFile("settings.yaml")
-
     except Exception as e:
-        # 如果找不到凭证文件，抛出错误
-        raise Exception(
-            f"无法加载凭证文件，请检查 settings.yaml 或 token.json 是否存在。错误: {e}"
-        )
-
-    # 如果 Access Token 过期，使用 Refresh Token 刷新
+        raise Exception(f"无法加载凭证文件，请检查 settings.yaml 是否存在。错误: {e}")
+    
     if gauth.access_token_expired or not gauth.credentials:
         print("凭证已过期或需要刷新，正在刷新 Access Token...")
         gauth.Refresh()
     else:
-        # 如果 Access Token 有效，直接授权
         gauth.Authorize()
-
-    # 保存新的 Access Token (可选，但推荐)
+        
     gauth.SaveCredentialsFile("settings.yaml")
-
     print("Google Drive 认证成功！")
     return GoogleDrive(gauth)
 
+def get_folder_id_by_path(drive_service, path):
+    """通过路径查找文件夹 ID (代码省略，使用之前修复后的版本)"""
+    # 假设这里的实现是正确的，它返回目标文件夹的 ID 或 None
+    # ... [请确保你之前修复好的 get_folder_id_by_path 函数在这里] ...
+    
+    # 示例简化版 (需要你插入之前修复好的代码)
+    path_components = [p.strip() for p in path.split('/') if p.strip()]
+    current_parent_id = 'root'
+    
+    for folder_name in path_components:
+        query = (
+            f"title = '{folder_name}' and "
+            f"'{current_parent_id}' in parents and "
+            "trashed = false and "
+            "mimeType = 'application/vnd.google-apps.folder'"
+        )
+        file_list = drive_service.ListFile({'q': query}).GetList()
+        
+        if not file_list:
+            print(f"!!! 错误: 路径解析失败，找不到文件夹 '{folder_name}'。")
+            return None
+        
+        current_parent_id = file_list[0]['id']
+    return current_parent_id
 
-def upload_file(drive_service, local_filepath, parent_folder_id=None):
+
+# --- 核心上传函数 ---
+
+def upload_directory_recursive(drive_service, local_path, parent_drive_id):
     """
-    上传指定文件到 Google Drive
+    递归上传本地文件夹及其内容到 Google Drive。
     :param drive_service: GoogleDrive 对象
-    :param local_filepath: 本地文件完整路径
-    :param parent_folder_id: 目标文件夹 ID
-    :return: 上传后的文件 ID
+    :param local_path: 本地文件夹路径
+    :param parent_drive_id: 云端目标父文件夹 ID
+    :return: 云端新创建的文件夹 ID
     """
-    if not os.path.exists(local_filepath):
-        print(f"错误: 本地文件 {local_filepath} 不存在。")
-        return None
+    folder_name = os.path.basename(local_path)
+    print(f"\n--- 开始上传文件夹: {folder_name} ---")
 
-    file_name = os.path.basename(local_filepath)
+    # 1. 在云端创建新文件夹
+    folder_metadata = {
+        'title': folder_name,
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [{'id': parent_drive_id}]
+    }
+    drive_folder = drive_service.CreateFile(folder_metadata)
+    drive_folder.Upload()
+    new_folder_id = drive_folder['id']
+    print(f"已创建云端文件夹 '{folder_name}' (ID: {new_folder_id})")
 
-    # 1. 创建一个 DriveFile 对象
-    file_drive = drive_service.CreateFile({"title": file_name})
+    # 2. 遍历本地文件夹内容
+    for item_name in os.listdir(local_path):
+        local_item_path = os.path.join(local_path, item_name)
+        
+        if os.path.isfile(local_item_path):
+            # 是文件，直接上传到新创建的文件夹中
+            file_drive = drive_service.CreateFile({
+                'title': item_name,
+                'parents': [{'id': new_folder_id}]
+            })
+            file_drive.SetContentFile(local_item_path)
+            file_drive.Upload()
+            print(f"  - 上传文件: {item_name}")
 
-    # 2. 指定上传目标文件夹
-    if parent_folder_id:
-        file_drive["parents"] = [{"id": parent_folder_id}]
-
-    # 3. 关联本地文件内容
-    file_drive.SetContentFile(local_filepath)
-
-    # 4. 执行上传操作
-    file_drive.Upload()
-
-    print(f"\n--- 上传成功 ---")
-    print(f"文件名: {file_name}")
-    print(f"文件 ID: {file_drive['id']}")
-    print(f"Google Drive 链接: https://drive.google.com/open?id={file_drive['id']}")
-    return file_drive["id"]
+        elif os.path.isdir(local_item_path):
+            # 是子文件夹，递归调用自身
+            print(f"  - 进入子文件夹: {item_name}")
+            upload_directory_recursive(drive_service, local_item_path, new_folder_id)
+            
+    return new_folder_id
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--date", type=str, default="2025-08-09")
-    parser.add_argument("--where", default="hk", type=str)
-    args = parser.parse_args()
-    try:
-        # 1. 认证
-        drive = authenticate_drive()
-
-        # 2. 上传文件
-        local_filepath = os.path.join("dataset", "hsi_stock_data", f"Date={args.date}")
-        folder_metadata = {
-            'title': local_filepath,
-            'mimeType': 'application/vnd.google-apps.folder',
-            'parents': None
-        }
-        drive_folder = drive.CreateFile(folder_metadata)
-        drive_folder.Upload()
-        new_folder_id = drive_folder['id']
-        print(f"已创建新文件夹 '{local_filepath}' (ID: {new_folder_id})")
-        for filename in os.listdir(local_filepath):
-            upload_file(drive, os.path.join(local_filepath, filename), new_folder_id)
-
-    except Exception as e:
-        print(f"操作过程中发生致命错误: {e}")
+if __name__ == '__main__':
+    # 确保本地文件夹存在
+    if not os.path.isdir(LOCAL_UPLOAD_PATH):
+        print(f"错误: 本地文件夹路径不存在或不是目录: {LOCAL_UPLOAD_PATH}")
+    else:
+        try:
+            # 1. 认证
+            drive = authenticate_drive()
+            
+            # 2. 查找云端父目录 ID
+            print(f"开始查找云端父目录 ID: {DRIVE_PARENT_PATH}")
+            parent_id = get_folder_id_by_path(drive, DRIVE_PARENT_PATH)
+            
+            if parent_id is None:
+                print("操作终止：无法找到云端目标父目录。")
+            else:
+                # 3. 递归上传本地文件夹
+                upload_directory_recursive(drive, LOCAL_UPLOAD_PATH, parent_id)
+                print("\n--- 文件夹上传操作完成 ---")
+            
+        except Exception as e:
+            print(f"操作过程中发生致命错误: {e}")
