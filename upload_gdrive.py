@@ -1,12 +1,8 @@
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 import os
+import argparse
 
-# --- 配置 ---
-# 本地要上传的完整文件夹路径
-LOCAL_UPLOAD_PATH = './dataset/hsi_stock_data/Date=2025-10-17' 
-# 云端目标父目录路径 (上传后，新文件夹将位于此路径下)
-DRIVE_PARENT_PATH = 'stock_dataset/hsi_stock_data'
 
 # --- 认证和路径解析函数 (假设它们已修复并正常工作) ---
 
@@ -102,6 +98,15 @@ def upload_directory_recursive(drive_service, local_path, parent_drive_id):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--date", type=str, default="2025-08-09")
+    parser.add_argument("--where", default="hk", type=str)
+    args = parser.parse_args()
+    # --- 配置 ---
+    # 本地要上传的完整文件夹路径
+    LOCAL_UPLOAD_PATH = f'./dataset/hsi_stock_data/Date={args.date}' 
+    # 云端目标父目录路径 (上传后，新文件夹将位于此路径下)
+    DRIVE_PARENT_PATH = 'stock_dataset/hsi_stock_data'
     # 确保本地文件夹存在
     if not os.path.isdir(LOCAL_UPLOAD_PATH):
         print(f"错误: 本地文件夹路径不存在或不是目录: {LOCAL_UPLOAD_PATH}")
