@@ -4,7 +4,8 @@ on:
   # 设置定时任务触发器 (Cron表达式)
   schedule:
     # GitHub Actions 的时间基于 UTC。
-    - cron: '48 7,8 * * 1-5'
+    - cron: '48 7 * * 1-5'
+    - cron: '35 8 * * 1-5'
   
   # 允许手动触发，方便测试
   workflow_dispatch: 
